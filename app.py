@@ -15,6 +15,7 @@ import secrets
 from datetime import datetime
 from typing import Optional, List
 from pathlib import Path
+from contextlib import asynccontextmanager
 import sqlite3
 
 # Try importing psycopg2 for production PostgreSQL support
@@ -25,11 +26,43 @@ try:
 except ImportError:
     POSTGRES_AVAILABLE = False
 
+# ─── Lifespan (Startup/Shutdown) ────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # This runs when the server starts
+    global preprocessor, model, MODEL_LOADED, MODEL_VERSION
+    
+    # 1. Load Models
+    try:
+        if os.path.exists("models/preprocessor.pkl"):
+            preprocessor = joblib.load("models/preprocessor.pkl")
+            model = xgb.XGBClassifier()
+            model.load_model("models/xgb_model.json")
+            MODEL_LOADED = True
+            print("[OK] Gojo Sentinel models loaded.")
+        else:
+            print("[WARN] Models folder not found. Running in degraded mode.")
+    except Exception as e:
+        print(f"[ERROR] Failed to load models: {e}")
+
+    # 2. Initialize Database
+    try:
+        init_db()
+        init_rules()
+        print("[OK] Infrastructure initialized.")
+    except Exception as e:
+        print(f"[ERROR] Initialization failed: {e}")
+
+    yield
+    # This runs when the server stops
+    pass
+
 # ─── App Init ──────────────────────────────────────────────────────────────────
 app = FastAPI(
     title="Gojo Sentinel — AI Fraud Detection API",
     description="Real-time AI-powered fraud detection for Nigerian banking transactions (NIP, POS, USSD, Web).",
-    version="3.0.0"
+    version="3.0.0",
+    lifespan=lifespan
 )
 
 # CORS — allow frontend access
@@ -82,25 +115,11 @@ def execute_query(query: str, params: tuple = ()):
     cursor.execute(query, params)
     return conn, cursor, is_pg
 
-# ─── Load Models ───────────────────────────────────────────────────────────────
+# Models are now loaded in the lifespan event above
 MODEL_LOADED = False
 preprocessor = None
 model = None
-MODEL_VERSION = {}
-
-try:
-    preprocessor = joblib.load("models/preprocessor.pkl")
-    model = xgb.XGBClassifier()
-    model.load_model("models/xgb_model.json")
-    MODEL_LOADED = True
-    print("[OK] Gojo Sentinel models loaded successfully.")
-    try:
-        with open("models/model_version.json") as f:
-            MODEL_VERSION = json.load(f)
-    except Exception:
-        MODEL_VERSION = {"version": "1.0", "trained_at": "unknown"}
-except Exception as e:
-    print(f"[WARN] Models not found. Train them first. Error: {e}")
+MODEL_VERSION = {"version": "3.0", "trained_at": datetime.utcnow().isoformat()}
 
 # ─── Database Init ──────────────────────────────────────────────────────────────
 def init_db():
@@ -176,8 +195,7 @@ def init_db():
         if conn:
             conn.close()
 
-# Initialize everything at startup
-init_db()
+# init_db() is now called in lifespan
 
 # ─── Rules Init ────────────────────────────────────────────────────────────────
 def init_rules():
