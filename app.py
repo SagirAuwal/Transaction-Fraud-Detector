@@ -48,22 +48,25 @@ DATABASE_URL = os.getenv("DATABASE_URL") # Provided by Render/Heroku
 
 def get_db_conn():
     """Returns a database connection and a flag indicating if it's PostgreSQL."""
-    if DATABASE_URL and DATABASE_URL.startswith("postgres"):
+    global DATABASE_URL
+    if DATABASE_URL and (DATABASE_URL.startswith("postgres") or "supabase" in DATABASE_URL):
         if not POSTGRES_AVAILABLE:
-            raise Exception("PostgreSQL URL provided but psycopg2-binary not installed.")
-        # Fix for Heroku/Render where URL might start with 'postgres://' instead of 'postgresql://'
-        url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        try:
-            # Use a timeout to prevent hanging on connection issues
-            conn = psycopg2.connect(url, connect_timeout=5)
-            return conn, True
-        except Exception as e:
-            print(f"⚠️ PostgreSQL connection failed: {e}")
-            print("🔄 Falling back to local SQLite database for this session...")
+            print("❌ psycopg2-binary not installed. Falling back to SQLite.")
+        else:
+            # Fix for common URL prefix issues
+            url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+            try:
+                # 5 second timeout to keep the app responsive
+                conn = psycopg2.connect(url, connect_timeout=5)
+                return conn, True
+            except Exception as e:
+                print(f"⚠️ Supabase Connection Failed: {e}")
+                print("🔄 Using local SQLite database instead.")
     
-    # Ensure data directory exists for SQLite
+    # Absolute path for SQLite to ensure it works on Render/Vercel
     Path("data").mkdir(exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    db_path = os.path.abspath(DB_PATH)
+    conn = sqlite3.connect(db_path)
     return conn, False
 
 def execute_query(query: str, params: tuple = ()):
