@@ -53,9 +53,15 @@ def get_db_conn():
             raise Exception("PostgreSQL URL provided but psycopg2-binary not installed.")
         # Fix for Heroku/Render where URL might start with 'postgres://' instead of 'postgresql://'
         url = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-        conn = psycopg2.connect(url)
-        return conn, True
+        try:
+            # Use a timeout to prevent hanging on connection issues
+            conn = psycopg2.connect(url, connect_timeout=5)
+            return conn, True
+        except Exception as e:
+            print(f"⚠️ PostgreSQL connection failed: {e}")
+            print("🔄 Falling back to local SQLite database for this session...")
     
+    # Ensure data directory exists for SQLite
     Path("data").mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     return conn, False
@@ -160,7 +166,10 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+try:
+    init_db()
+except Exception as e:
+    print(f"[ERROR] Database initialization failed: {e}")
 
 # ─── Rules Init ────────────────────────────────────────────────────────────────
 def init_rules():
@@ -176,7 +185,10 @@ def init_rules():
             json.dump(default_rules, f, indent=2)
         print("[OK] Default fraud rules created.")
 
-init_rules()
+try:
+    init_rules()
+except Exception as e:
+    print(f"[ERROR] Rules initialization failed: {e}")
 
 # ─── Auth Helpers ───────────────────────────────────────────────────────────────
 def hash_password(password: str) -> str:
