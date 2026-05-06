@@ -101,75 +101,80 @@ except Exception as e:
 
 # ─── Database Init ──────────────────────────────────────────────────────────────
 def init_db():
-    conn, is_pg = get_db_conn()
-    c = conn.cursor()
+    conn = None
+    try:
+        conn, is_pg = get_db_conn()
+        c = conn.cursor()
 
-    # PK Syntax differences
-    id_pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        # PK Syntax differences
+        id_pk = "SERIAL PRIMARY KEY" if is_pg else "INTEGER PRIMARY KEY AUTOINCREMENT"
 
-    # Prediction history
-    c.execute(f"""
-        CREATE TABLE IF NOT EXISTS predictions (
-            id {id_pk},
-            transaction_id TEXT,
-            user_id TEXT,
-            amount_ngn REAL,
-            sender_bank TEXT,
-            receiver_bank TEXT,
-            channel TEXT,
-            bvn_match INTEGER,
-            fraud_probability REAL,
-            is_fraud INTEGER,
-            risk_level TEXT,
-            recommendation TEXT,
-            scored_at TEXT
-        )
-    """)
-
-    # Users table
-    c.execute(f"""
-        CREATE TABLE IF NOT EXISTS users (
-            id {id_pk},
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'staff',
-            full_name TEXT,
-            email TEXT,
-            is_active INTEGER DEFAULT 1,
-            created_at TEXT,
-            last_login TEXT
-        )
-    """)
-
-    # Sessions table
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS sessions (
-            token TEXT PRIMARY KEY,
-            user_id INTEGER,
-            username TEXT,
-            role TEXT,
-            created_at TEXT
-        )
-    """)
-
-    # Seed default admin if no users exist
-    c.execute("SELECT COUNT(*) FROM users")
-    if c.fetchone()[0] == 0:
-        admin_hash = hashlib.sha256("gojo2026".encode()).hexdigest()
-        placeholder = "%s" if is_pg else "?"
+        # Prediction history
         c.execute(f"""
-            INSERT INTO users (username, password_hash, role, full_name, email, created_at)
-            VALUES ({placeholder}, {placeholder}, 'admin', 'System Administrator', 'admin@gojosentinel.ng', {placeholder})
-        """, ("admin", admin_hash, datetime.utcnow().isoformat()))
-        print("[OK] Default admin created: admin / gojo2026")
+            CREATE TABLE IF NOT EXISTS predictions (
+                id {id_pk},
+                transaction_id TEXT,
+                user_id TEXT,
+                amount_ngn REAL,
+                sender_bank TEXT,
+                receiver_bank TEXT,
+                channel TEXT,
+                bvn_match INTEGER,
+                fraud_probability REAL,
+                is_fraud INTEGER,
+                risk_level TEXT,
+                recommendation TEXT,
+                scored_at TEXT
+            )
+        """)
 
-    conn.commit()
-    conn.close()
+        # Users table
+        c.execute(f"""
+            CREATE TABLE IF NOT EXISTS users (
+                id {id_pk},
+                username TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'staff',
+                full_name TEXT,
+                email TEXT,
+                is_active INTEGER DEFAULT 1,
+                created_at TEXT,
+                last_login TEXT
+            )
+        """)
 
-try:
-    init_db()
-except Exception as e:
-    print(f"[ERROR] Database initialization failed: {e}")
+        # Sessions table
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                token TEXT PRIMARY KEY,
+                user_id INTEGER,
+                username TEXT,
+                role TEXT,
+                created_at TEXT
+            )
+        """)
+
+        # Seed default admin if no users exist
+        c.execute("SELECT COUNT(*) FROM users")
+        if c.fetchone()[0] == 0:
+            admin_hash = hashlib.sha256("gojo2026".encode()).hexdigest()
+            placeholder = "%s" if is_pg else "?"
+            c.execute(f"""
+                INSERT INTO users (username, password_hash, role, full_name, email, created_at)
+                VALUES ({placeholder}, {placeholder}, 'admin', 'System Administrator', 'admin@gojosentinel.ng', {placeholder})
+            """, ("admin", admin_hash, datetime.utcnow().isoformat()))
+            print("[OK] Default admin created: admin / gojo2026")
+
+        conn.commit()
+        print("[OK] Database tables initialized.")
+    except Exception as e:
+        print(f"[ERROR] Database initialization failed: {e}")
+    finally:
+        if conn:
+            conn.close()
+
+# Initialize everything at startup
+init_db()
 
 # ─── Rules Init ────────────────────────────────────────────────────────────────
 def init_rules():
