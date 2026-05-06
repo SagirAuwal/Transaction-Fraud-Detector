@@ -3,8 +3,8 @@
    AI fraud detection frontend for Nigerian transactions with admin security.
 ───────────────────────────────────────────────────────────────────────────── */
 
-const API_ROOT   = window.location.origin === 'http://127.0.0.1:5500' || window.location.origin.includes('localhost') 
-                    ? 'http://localhost:8000/api/v1' 
+const API_ROOT   = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' || window.location.port === '5500')
+                    ? 'http://localhost:8000/api/v1'
                     : '/api/v1';
 const API_URL    = `${API_ROOT}/predict`;
 const HEALTH_URL = `${API_ROOT}/health`;
