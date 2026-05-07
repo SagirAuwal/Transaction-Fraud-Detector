@@ -1,0 +1,6 @@
+{
+  "appId": "com.gojosentinel.app",
+  "appName": "Gojo Sentinel",
+  "webDir": "www",
+  "bundledWebRuntime": false
+}

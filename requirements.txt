@@ -4,13 +4,8 @@ pandas
 numpy
 scikit-learn
 xgboost
-imbalanced-learn
 pydantic
-shap
-slowapi
 python-dotenv
-category_encoders
 joblib
-gunicorn
 psycopg2-binary
 aiofiles
