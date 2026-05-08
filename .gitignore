@@ -30,7 +30,6 @@ Thumbs.db
 # Mobile & Web
 node_modules/
 mobile/node_modules/
-mobile/android/
 dist/
 www/
 .capacitor/
